@@ -24,33 +24,33 @@
 )
 
 (defn merge-props [label props merge-prop neo4j-conn]
-  (cypher/tquery neo4j-conn (str "MERGE (node:`" label "` {" merge-prop ": {props}." merge-prop "}) SET node = {props} RETURN node") {"props" props})
+  (cypher/tquery neo4j-conn (str "MERGE (node:`" label "` {" merge-prop ": {props}." merge-prop "}) SET node:StackOverflow, node = {props} RETURN node") {"props" props})
 )
 
 (defn import-user [user neo4j-conn]
   (let [keys (str/split "user_id reputation user_type accept_rate profile_image display_name link" #" ")]
-    (merge-props "StackOverflowUser" (select-keys user keys) "user_id" neo4j-conn)
+    (merge-props "User" (select-keys user keys) "user_id" neo4j-conn)
   )
 )
 
 (defn import-tag [tag-text neo4j-conn]
-  (merge-props "StackOverflowTag" {"text" tag-text} "text" neo4j-conn)
+  (merge-props "Tag" {"text" tag-text} "text" neo4j-conn)
 )
 
 
 (defn import-question [question neo4j-conn]
   (println "Called import-question")
   (let [keys (str/split "question_id score view_count creation_date last_activity_date title link is_answered answer_count" #" ")]
-    (merge-props "StackOverflowQuestion" (select-keys question keys) "question_id" neo4j-conn)
+    (merge-props "Question" (select-keys question keys) "question_id" neo4j-conn)
 
     (import-user (question "owner") neo4j-conn)
-    (cypher/tquery neo4j-conn "MATCH (q:StackOverflowQuestion {question_id: {question_id}}), (u:StackOverflowUser {user_id: {user_id}}) CREATE u-[:owns_question]->q" {:question_id (question "question_id") :user_id ((question "owner") "user_id")})
+    (cypher/tquery neo4j-conn "MATCH (q:Question {question_id: {question_id}}), (u:User {user_id: {user_id}}) CREATE u-[:ASKED]->q" {:question_id (question "question_id") :user_id ((question "owner") "user_id")})
 
     (dorun
       (for [tag-text (question "tags")]
         (do
           (import-tag tag-text neo4j-conn)
-          (cypher/tquery neo4j-conn "MATCH (q:StackOverflowQuestion {question_id: {question_id}}), (t:StackOverflowTag {text: {tag_text}}) CREATE q-[:has_tag]->t" {:question_id (question "question_id") :tag_text tag-text})
+          (cypher/tquery neo4j-conn "MATCH (q:Question {question_id: {question_id}}), (t:Tag {text: {tag_text}}) CREATE q<-[:TAGS]-t" {:question_id (question "question_id") :tag_text tag-text})
         )
       )
     )
@@ -60,12 +60,12 @@
 (defn import-answer [answer neo4j-conn]
   (println "Called import-answer")
   (let [keys (str/split "answer_id creation_date is_accepted last_activity_date question_id score" #" ")]
-    (merge-props "StackOverflowAnswer" (select-keys answer keys) "answer_id" neo4j-conn)
+    (merge-props "Answer" (select-keys answer keys) "answer_id" neo4j-conn)
     
     (import-user (answer "owner") neo4j-conn)
-    (cypher/tquery neo4j-conn "MATCH (a:StackOverflowAnswer {answer_id: {answer_id}}), (u:StackOverflowUser {user_id: {user_id}}) CREATE u-[:owns_answer]->a" {:answer_id (answer "answer_id") :user_id ((answer "owner") "user_id")})
+    (cypher/tquery neo4j-conn "MATCH (a:Answer {answer_id: {answer_id}}), (u:User {user_id: {user_id}}) CREATE u-[:PROVIDED]->a" {:answer_id (answer "answer_id") :user_id ((answer "owner") "user_id")})
 
-    (cypher/tquery neo4j-conn "MATCH (q:StackOverflowQuestion {question_id: {question_id}}), (a:StackOverflowAnswer {answer_id: {answer_id}}) CREATE a-[:answers_question]->q" {:answer_id (answer "answer_id") :question_id (answer "question_id")})
+    (cypher/tquery neo4j-conn "MATCH (q:Question {question_id: {question_id}}), (a:Answer {answer_id: {answer_id}}) CREATE a-[:ANSWERS]->q" {:answer_id (answer "answer_id") :question_id (answer "question_id")})
   )
 )
 
@@ -73,10 +73,10 @@
   [& args]
 
   (let [neo4j-conn  (nr/connect "http://localhost:7777/db/data/")]
-    (cypher/tquery neo4j-conn "CREATE CONSTRAINT ON (q:StackOverflowQuestion) ASSERT q.question_id IS UNIQUE")
-    (cypher/tquery neo4j-conn "CREATE CONSTRAINT ON (a:StackOverflowAnswer) ASSERT a.answer_id IS UNIQUE")
-    (cypher/tquery neo4j-conn "CREATE CONSTRAINT ON (u:StackOverflowUser) ASSERT u.user_id IS UNIQUE")
-    (cypher/tquery neo4j-conn "CREATE CONSTRAINT ON (t:StackOverflowTag) ASSERT t.text IS UNIQUE")
+    (cypher/tquery neo4j-conn "CREATE CONSTRAINT ON (q:Question) ASSERT q.question_id IS UNIQUE")
+    (cypher/tquery neo4j-conn "CREATE CONSTRAINT ON (a:Answer) ASSERT a.answer_id IS UNIQUE")
+    (cypher/tquery neo4j-conn "CREATE CONSTRAINT ON (u:User) ASSERT u.user_id IS UNIQUE")
+    (cypher/tquery neo4j-conn "CREATE CONSTRAINT ON (t:Tag) ASSERT t.text IS UNIQUE")
 
     (cypher/tquery neo4j-conn "MATCH n OPTIONAL MATCH n-[r]-() DELETE n, r")
 
