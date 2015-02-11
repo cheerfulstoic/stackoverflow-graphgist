@@ -1,36 +1,23 @@
 # stackoverflow-graphgist
 
-FIXME: description
+This is a Clojure project build with Leiningen to import data from the StackOverflow API into Neo4j.
 
-## Installation
+While it is written with code reuse in mind, there are some known kinks:
+ * Neo4j server is hardcoded
+ * It is currently coded to import 1000 questions (10 pages) tagged `neo4j` and to also get the associated askers (Users), Answers, and answerers (Users).  See the model image below.
 
-Download from http://example.com/FIXME.
+## Model
 
-## Usage
+![StackOverflow domain model](https://raw.githubusercontent.com/cheerfulstoic/stackoverflow-graphgist/master/model.png)
 
-FIXME: explanation
+## Installation and usage
 
-    $ java -jar stackoverflow-graphgist-0.1.0-standalone.jar [args]
-
-## Options
-
-FIXME: listing of options this app accepts.
-
-## Examples
-
-...
-
-### Bugs
-
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
+ * Clone this repository
+ * Install [Leiningen](http://leiningen.org/)
+ * Run `lein repl`
+ * Execute `(stackoverflow-graphgist.core/-main)`
 
 ## License
-
-Copyright © 2015 FIXME
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
