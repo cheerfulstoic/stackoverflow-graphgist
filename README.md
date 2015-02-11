@@ -1,6 +1,6 @@
 # stackoverflow-graphgist
 
-This is a Clojure project build with Leiningen to import data from the StackOverflow API into Neo4j.
+This is a Clojure project built with Leiningen to import data from the StackOverflow API into Neo4j.
 
 While it is written with code reuse in mind, there are some known kinks:
  * Neo4j server is hardcoded
