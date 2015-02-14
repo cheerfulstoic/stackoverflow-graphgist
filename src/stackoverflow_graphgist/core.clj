@@ -9,13 +9,9 @@
   )
 
 
-; (defn stackoverflow-get-questions [page]
-;   (let [path (str "data" (str page) ".json")]
-;     (slurp path)))
-
- (defn stackoverflow-get-questions [page]
-   (let [url (str "http://api.stackexchange.com/2.2/search?pagesize=100&page=" page "&order=desc&sort=activity&tagged=neo4j&site=stackoverflow")]
-     ((client/get url) :body)))
+(defn stackoverflow-get-questions [page]
+  (let [url (str "http://api.stackexchange.com/2.2/search?pagesize=100&page=" page "&order=desc&sort=activity&tagged=neo4j&site=stackoverflow")]
+    ((client/get url) :body)))
 
 (defn stackoverflow-get-answers [question-ids]
   (let [url (str "https://api.stackexchange.com/2.2/questions/" (str/join ";" question-ids) "/answers?order=desc&sort=activity&site=stackoverflow")]
@@ -24,7 +20,9 @@
 )
 
 (defn merge-props [label props merge-prop neo4j-conn]
-  (cypher/tquery neo4j-conn (str "MERGE (node:`" label "` {" merge-prop ": {props}." merge-prop "}) SET node:StackOverflow, node = {props} RETURN node") {"props" props})
+  (if-not (nil? (props merge-prop))
+    (cypher/tquery neo4j-conn (str "MERGE (node:`" label "` {" merge-prop ": {props}." merge-prop "}) SET node:StackOverflow, node = {props} RETURN node") {"props" props})
+    )
 )
 
 (defn import-user [user neo4j-conn]
@@ -69,6 +67,20 @@
   )
 )
 
+
+(defn import-page [page-number neo4j-conn]
+  (println (str "Importing page: " page-number))
+  (let [data (parse-string (stackoverflow-get-questions page-number))
+              questions (data "items")
+              has-more (data "has_more")
+              question-ids (map #(%1 "question_id") questions)
+              answers ((parse-string (stackoverflow-get-answers question-ids)) "items")]
+      (doseq [question questions] (import-question question neo4j-conn))
+      (doseq [answer answers]     (import-answer answer neo4j-conn))
+      has-more
+    )
+  )
+
 (defn -main
   [& args]
 
@@ -80,15 +92,8 @@
 
     (cypher/tquery neo4j-conn "MATCH n OPTIONAL MATCH n-[r]-() DELETE n, r")
 
-    (doseq [page (range 1 11)
-            :let [data (parse-string (stackoverflow-get-questions page))
-                  questions (data "items")
-                  has-more (data "has_more")
-                  question-ids (map #(%1 "question_id") questions)
-                  answers ((parse-string (stackoverflow-get-answers question-ids)) "items")]]
-      (doseq [question questions] (import-question question neo4j-conn))
-      (doseq [answer answers]     (import-answer answer neo4j-conn))
-    )
+    (take-while #(import-page %1 neo4j-conn) (map #(inc %1) (range)))
+
   )
 )
 
